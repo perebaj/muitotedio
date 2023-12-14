@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Problem struct {
@@ -31,17 +32,41 @@ func main() {
 		os.Exit(1)
 	}
 
-	var userAnswer int
-	for _, v := range problems {
-		fmt.Println("What is the result of", v.Question, "?")
-		fmt.Scan(&userAnswer)
-		if userAnswer != v.Answer {
-			fmt.Println("Incorrect")
-		} else {
-			fmt.Println("Correct")
+	timeout := time.After(60 * time.Second)
+
+	c := quizProgress(problems)
+
+	for {
+		select {
+		case <-timeout:
+			fmt.Println("You ran out of time")
+			return
+		case answer := <-c:
+			if !answer {
+				return
+			}
 		}
 	}
-	fmt.Println("You have finished the quiz")
+}
+
+func quizProgress(problems []Problem) chan bool {
+	var userAnswer int
+	c := make(chan bool)
+	go func() {
+		for _, v := range problems {
+			fmt.Println("What is the result of", v.Question, "?")
+			fmt.Scan(&userAnswer)
+			if userAnswer != v.Answer {
+				fmt.Println("Wrong answer")
+				c <- false
+			}
+			c <- true
+		}
+		fmt.Println("You have finished the quiz")
+		c <- false
+	}()
+
+	return c
 }
 
 func parseCSV(fName string) (problems []Problem, err error) {
